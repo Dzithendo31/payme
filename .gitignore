@@ -44,7 +44,7 @@ logs/
 *.bak
 *.swp
 *~
-projectplan.md
+warp/
 
 # Environment
 .env
