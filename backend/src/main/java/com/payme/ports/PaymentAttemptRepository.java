@@ -22,4 +22,9 @@ public interface PaymentAttemptRepository {
      * Finds all payment attempts for a given invoice.
      */
     List<PaymentAttempt> findByInvoiceId(InvoiceId invoiceId);
+
+    /**
+     * Finds a payment attempt by provider reference.
+     */
+    Optional<PaymentAttempt> findByProviderReference(String providerReference);
 }

@@ -39,4 +39,10 @@ public class PaymentAttemptRepositoryAdapter implements PaymentAttemptRepository
                 .map(PaymentAttemptJpaEntity::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public Optional<PaymentAttempt> findByProviderReference(String providerReference) {
+        return jpaRepository.findByProviderReference(providerReference)
+                .map(PaymentAttemptJpaEntity::toDomain);
+    }
 }
