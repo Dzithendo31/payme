@@ -16,3 +16,9 @@ DDD, hexagonal
 - Internent went down, could not complete the vibes
 - can create invoice so the basic rest api is set and we should be adding tests fior the use case before pahse 02
 - Looking Gooodddddd.
+
+
+18/19 january
+- Implmetation of the Gatway has been completed
+- the flow has been created in our api-cient(bruno)
+
