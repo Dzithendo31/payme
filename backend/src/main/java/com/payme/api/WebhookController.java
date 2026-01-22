@@ -40,8 +40,12 @@ public class WebhookController {
             // Parse provider name
             ProviderName providerName = ProviderName.valueOf(provider.toUpperCase());
 
-            // Extract headers
+            // Extract headers and add source IP
             Map<String, String> headers = extractHeaders(request);
+            String sourceIp = getClientIpAddress(request);
+            headers.put("X-Source-IP", sourceIp);
+
+            log.debug("Webhook source IP: {}", sourceIp);
 
             // Process webhook
             processWebhookUseCase.processWebhook(providerName, rawBody, headers);
@@ -75,5 +79,27 @@ public class WebhookController {
         }
 
         return headers;
+    }
+
+    /**
+     * Extracts the client IP address from the request.
+     * Considers X-Forwarded-For header for proxied requests.
+     *
+     * @param request HTTP request
+     * @return Client IP address
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            // X-Forwarded-For can contain multiple IPs, take the first one
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+
+        return request.getRemoteAddr();
     }
 }
