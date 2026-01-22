@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PayMe — Pay Invoice</title>
+  <link rel="stylesheet" href="/pay/pay.css" />
+</head>
+<body>
+  <main class="phone">
+    <header class="top">
+      <div>
+        <div class="muted">Good Afternoon</div>
+        <div class="title" id="customerTitle">Customer</div>
+      </div>
+      <div class="avatar" aria-hidden="true"></div>
+    </header>
+
+    <section class="card">
+      <div class="muted">Invoice amount</div>
+      <div class="amount" id="amount">$0.00</div>
+      <div class="row">
+        <div class="pill" id="statusPill">STATUS</div>
+        <div class="muted" id="expiresAt"></div>
+      </div>
+      <div class="desc" id="description">—</div>
+    </section>
+
+    <section class="actions">
+      <button class="btn primary" id="payBtn">Pay</button>
+      <a class="btn ghost" id="refreshBtn" href="#">Refresh</a>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <div class="sectionTitle">Activity</div>
+        <a class="link" id="merchantLink" href="#" aria-disabled="true">See all</a>
+      </div>
+      <div class="activity" id="activity">
+        <div class="activityItem">
+          <div class="muted">Invoice created</div>
+          <div class="mutedSmall" id="createdAt">—</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footnote">
+      Payments are confirmed by processing events. If you’re redirected early, we’ll update this page automatically.
+    </footer>
+  </main>
+
+  <script src="/pay/pay.js"></script>
+</body>
+</html>

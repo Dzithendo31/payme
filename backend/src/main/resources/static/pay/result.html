@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PayMe — Payment Result</title>
+  <link rel="stylesheet" href="/pay/pay.css" />
+</head>
+<body>
+  <main class="phone">
+    <section class="card center">
+      <div class="big" id="headline">Processing payment…</div>
+      <div class="muted" id="sub">We’re confirming your payment.</div>
+
+      <div class="spinner" aria-hidden="true"></div>
+
+      <div class="actionsStack">
+        <a class="btn ghost" id="backToInvoice" href="#">Back to invoice</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function getInvoiceIdFromPath() {
+      // /pay/{invoiceId}/result
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      return parts.length >= 2 ? parts[1] : null;
+    }
+    function qs(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    const invoiceId = getInvoiceIdFromPath();
+    const ret = qs("return"); // success | cancel
+    const headline = document.getElementById("headline");
+    const sub = document.getElementById("sub");
+    const back = document.getElementById("backToInvoice");
+    back.href = invoiceId ? `/pay/${encodeURIComponent(invoiceId)}` : "/";
+
+    if (!invoiceId) {
+      headline.textContent = "Invalid link";
+      sub.textContent = "Missing invoice id.";
+      throw new Error("Missing invoice id");
+    }
+
+    if (ret === "cancel") {
+      headline.textContent = "Payment cancelled";
+      sub.textContent = "You can try again when you’re ready.";
+      document.querySelector(".spinner")?.remove();
+    } else {
+      // success (or unknown): poll backend until webhook confirms
+      const pollIntervalMs = 2000;
+      const timeoutMs = 60000;
+      const start = Date.now();
+
+      async function poll() {
+        const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!res.ok) throw new Error(`Failed to load invoice: ${res.status}`);
+        const inv = await res.json();
+        const status = inv.status;
+
+        if (status === "SUCCEEDED") {
+          headline.textContent = "Payment confirmed ✅";
+          sub.textContent = "Thanks! Your payment is complete.";
+          document.querySelector(".spinner")?.remove();
+          return;
+        }
+        if (status === "FAILED" || status === "EXPIRED") {
+          headline.textContent = "Payment failed";
+          sub.textContent = "No charge was confirmed. Please try again.";
+          document.querySelector(".spinner")?.remove();
+          return;
+        }
+
+        if (Date.now() - start > timeoutMs) {
+          headline.textContent = "Still processing…";
+          sub.textContent = "We haven’t received confirmation yet. Refresh in a moment.";
+          document.querySelector(".spinner")?.remove();
+          return;
+        }
+
+        setTimeout(poll, pollIntervalMs);
+      }
+
+      poll().catch(() => {
+        headline.textContent = "Couldn’t confirm payment";
+        sub.textContent = "Please go back to the invoice and refresh.";
+        document.querySelector(".spinner")?.remove();
+      });
+    }
+  </script>
+</body>
+</html>

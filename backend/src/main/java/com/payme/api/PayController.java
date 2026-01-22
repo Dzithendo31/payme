@@ -7,12 +7,19 @@ import com.payme.application.StartCheckoutUseCase;
 import com.payme.domain.Invoice;
 import com.payme.domain.InvoiceId;
 import com.payme.ports.Clock;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@RestController
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+@Controller
 @RequestMapping("/pay")
 public class PayController {
 
@@ -32,14 +39,27 @@ public class PayController {
         this.clock = clock;
     }
 
-    @GetMapping("/{invoiceId}")
-    public ResponseEntity<PayPageResponse> getPayPage(@PathVariable String invoiceId) {
+    @GetMapping(value = "/{invoiceId:[0-9a-fA-F\\-]{36}}", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
+    public ResponseEntity<String> getPayPageHtml(@PathVariable String invoiceId) throws IOException {
+        // Serve the static HTML page directly
+        ClassPathResource resource = new ClassPathResource("static/pay/index.html");
+        String html = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(html);
+    }
+
+    @GetMapping(value = "/{invoiceId:[0-9a-fA-F\\-]{36}}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<PayPageResponse> getPayPageJson(@PathVariable String invoiceId) {
         Invoice invoice = getPayPageDataUseCase.execute(invoiceId);
         PayPageResponse response = PayPageResponse.fromDomain(invoice, clock);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{invoiceId}/checkout")
+    @PostMapping("/{invoiceId:[0-9a-fA-F\\-]{36}}/checkout")
+    @ResponseBody
     public ResponseEntity<CheckoutResponse> startCheckout(@PathVariable String invoiceId) {
         log.info("Received checkout request for invoice: {}", invoiceId);
 
