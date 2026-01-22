@@ -70,8 +70,7 @@ public class PayFastPaymentProvider implements PaymentProvider {
         params.put("signature", signature);
 
         // The checkout URL is the PayFast process endpoint
-        // In a real implementation, we'd need to submit a form with these parameters
-        // For now, we return the URL and parameters - the frontend will need to POST them
+        // The frontend will need to POST the form parameters to this URL
         String checkoutUrl = config.getProcessUrl();
 
         log.info("PayFast: Generated checkout URL: {}", checkoutUrl);
@@ -81,7 +80,7 @@ public class PayFastPaymentProvider implements PaymentProvider {
         // We use the invoiceId as a temporary reference
         String providerReference = "payfast_" + invoice.getInvoiceId().getValue();
 
-        return new CheckoutSession(checkoutUrl, providerReference);
+        return new CheckoutSession(checkoutUrl, providerReference, params);
     }
 
     @Override
@@ -94,14 +93,20 @@ public class PayFastPaymentProvider implements PaymentProvider {
             // Parse form-encoded body into map
             Map<String, String> params = parseFormEncodedBody(rawBody);
 
+            log.debug("=== WEBHOOK VERIFICATION START ===");
+            log.debug("Raw body length: {} chars", rawBody.length());
+            log.debug("Parsed parameters count: {}", params.size());
+            log.debug("Parameter keys (in order): {}", params.keySet());
+            params.forEach((k, v) -> log.debug("  {}: '{}'", k, v));
+            
             // Extract and remove signature
             String providedSignature = params.remove("signature");
             if (providedSignature == null || providedSignature.isEmpty()) {
                 throw new PayFastSignatureException("No signature provided in PayFast ITN");
             }
 
-            log.debug("PayFast ITN parameters: {}", params.keySet());
             log.debug("Provided signature: {}", providedSignature);
+            log.debug("Remaining params for verification: {}", params.keySet());
 
             // Verify signature
             boolean signatureValid = PayFastSignatureService.verifySignature(
@@ -160,7 +165,7 @@ public class PayFastPaymentProvider implements PaymentProvider {
      * @return Map of parameters
      */
     private Map<String, String> parseFormEncodedBody(String body) {
-        Map<String, String> params = new HashMap<>();
+        Map<String, String> params = new LinkedHashMap<>();
 
         if (body == null || body.isEmpty()) {
             return params;

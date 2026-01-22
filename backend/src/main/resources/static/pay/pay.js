@@ -77,8 +77,29 @@ async function startCheckout(invoiceId) {
     payBtn.disabled = true;
     payBtn.textContent = "Starting checkout…";
     try {
-      const { checkoutUrl } = await startCheckout(invoiceId);
-      window.location.assign(checkoutUrl);
+      const { checkoutUrl, formParameters } = await startCheckout(invoiceId);
+      
+      // If formParameters exist, create and submit a form (for PayFast)
+      if (formParameters && Object.keys(formParameters).length > 0) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = checkoutUrl;
+        
+        // Add each parameter as a hidden input
+        for (const [key, value] of Object.entries(formParameters)) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        // No form parameters, just redirect
+        window.location.assign(checkoutUrl);
+      }
     } catch (e) {
       payBtn.textContent = "Pay";
       payBtn.disabled = false;

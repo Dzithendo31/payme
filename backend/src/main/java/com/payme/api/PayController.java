@@ -68,7 +68,8 @@ public class PayController {
 
         CheckoutResponse response = new CheckoutResponse(
                 result.getCheckoutUrl(),
-                result.getAttemptId()
+                result.getAttemptId(),
+                result.getFormParameters()
         );
 
         log.info("Checkout started successfully for invoice: {}, attempt: {}",

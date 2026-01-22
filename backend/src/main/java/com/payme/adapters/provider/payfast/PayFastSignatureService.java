@@ -8,8 +8,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * 
  * PayFast signature requirements:
  * 1. Remove empty values from parameters
- * 2. Sort parameters alphabetically by key
+ * 2. Preserve parameter order (do NOT sort)
  * 3. Build query string with URL-encoded values
  * 4. Append passphrase if not empty
  * 5. Compute MD5 hash
@@ -36,18 +36,24 @@ public class PayFastSignatureService {
      */
     public static String generateSignature(Map<String, String> params, String passphrase) {
         try {
-            // Remove empty values and sort alphabetically
-            TreeMap<String, String> sortedParams = params.entrySet().stream()
-                    .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
+            log.debug("=== SIGNATURE GENERATION START ===");
+            log.debug("Input params keys (in order): {}", params.keySet());
+            params.forEach((k, v) -> log.debug("  {}: '{}' (trimmed: '{}')", k, v, v != null ? v.trim() : "null"));
+            
+            // Remove empty values (preserve insertion order) and trim
+            Map<String, String> filteredParams = params.entrySet().stream()
+                    .filter(entry -> entry.getValue() != null && !entry.getValue().trim().isEmpty())
                     .collect(Collectors.toMap(
                             Map.Entry::getKey,
-                            Map.Entry::getValue,
+                            entry -> entry.getValue().trim(),
                             (v1, v2) -> v1,
-                            TreeMap::new
+                            LinkedHashMap::new
                     ));
 
+            log.debug("Filtered params keys (in order): {}", filteredParams.keySet());
+            
             // Build query string with URL-encoded values
-            String queryString = sortedParams.entrySet().stream()
+            String queryString = filteredParams.entrySet().stream()
                     .map(entry -> entry.getKey() + "=" + urlEncode(entry.getValue()))
                     .collect(Collectors.joining("&"));
 
@@ -56,7 +62,9 @@ public class PayFastSignatureService {
                 queryString += "&passphrase=" + urlEncode(passphrase);
             }
 
-            log.debug("Signature string: {}", queryString.replace(passphrase != null ? passphrase : "", "***"));
+            String maskedQuery = queryString.replace(passphrase != null ? passphrase : "", "***");
+            log.debug("Full signature string: {}", maskedQuery);
+            log.debug("=== SIGNATURE GENERATION END ==="
 
             // Compute MD5 hash
             MessageDigest md = MessageDigest.getInstance("MD5");
@@ -110,8 +118,10 @@ public class PayFastSignatureService {
      */
     private static String urlEncode(String value) {
         try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+            String encoded = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
                     .replace("+", "%20"); // PayFast expects %20 for spaces, not +
+            log.debug("URL Encoding: '{}' -> '{}'", value, encoded);
+            return encoded;
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException("UTF-8 encoding not supported", e);
         }

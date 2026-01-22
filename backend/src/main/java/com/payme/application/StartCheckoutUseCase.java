@@ -83,17 +83,23 @@ public class StartCheckoutUseCase {
         invoiceRepository.save(invoice);
         log.info("Invoice marked as PENDING: {}", invoiceId.getValue());
 
-        // 7. Return checkout URL
-        return new CheckoutResult(session.getCheckoutUrl(), attemptId.getValue());
+        // 7. Return checkout URL and form parameters
+        return new CheckoutResult(
+                session.getCheckoutUrl(),
+                attemptId.getValue(),
+                session.getFormParameters()
+        );
     }
 
     public static class CheckoutResult {
         private final String checkoutUrl;
         private final String attemptId;
+        private final java.util.Map<String, String> formParameters;
 
-        public CheckoutResult(String checkoutUrl, String attemptId) {
+        public CheckoutResult(String checkoutUrl, String attemptId, java.util.Map<String, String> formParameters) {
             this.checkoutUrl = checkoutUrl;
             this.attemptId = attemptId;
+            this.formParameters = formParameters;
         }
 
         public String getCheckoutUrl() {
@@ -102,6 +108,10 @@ public class StartCheckoutUseCase {
 
         public String getAttemptId() {
             return attemptId;
+        }
+
+        public java.util.Map<String, String> getFormParameters() {
+            return formParameters;
         }
     }
 }
