@@ -18,7 +18,6 @@ PayMe is a payment platform that allows merchants to create invoices and share p
 - Instant EFT
 - SnapScan, Mobicred, and more
 - **Status**: ✅ Fully integrated
-- **Documentation**: [PayFast Setup Guide](docs/PAYFAST_SETUP.md)
 
 ### Fake Provider (Testing)
 - Test provider for development

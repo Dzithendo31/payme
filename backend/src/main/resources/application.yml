@@ -25,17 +25,9 @@ payme:
     provider: ${PAYMENT_PROVIDER:FAKE}
 
 payfast:
-  merchant-id: ${PAYFAST_MERCHANT_ID:10000100}
-  merchant-key: ${PAYFAST_MERCHANT_KEY:46f0cd694581a}
-  passphrase: ${PAYFAST_PASSPHRASE:}
+  merchant-id: ${PAYFAST_MERCHANT_ID}
+  merchant-key: ${PAYFAST_MERCHANT_KEY}
+  passphrase: ${PAYFAST_PASSPHRASE}
   sandbox: ${PAYFAST_SANDBOX:true}
   notify-url: ${PAYFAST_NOTIFY_URL:http://localhost:8080/webhooks/PAYFAST}
-  allowed-ips:
-    - 197.97.145.144
-    - 197.97.145.145
-    - 197.97.145.146
-    - 197.97.145.147
-    - 197.97.145.148
-    - 197.97.145.149
-    - 197.97.145.150
-    - 197.97.145.151
+  allowed-ips: 197.97.145.144,197.97.145.145,197.97.145.146,197.97.145.147,197.97.145.148,197.97.145.149,197.97.145.150,197.97.145.151
