@@ -65,6 +65,11 @@ public class PayFastPaymentProvider implements PaymentProvider {
         params.put("m_payment_id", invoice.getInvoiceId().getValue());
         params.put("custom_str1", attemptId.getValue());
 
+        log.info("=== GENERATING SIGNATURE FOR CHECKOUT ===");
+        log.info("Parameters BEFORE signature generation:");
+        params.forEach((k, v) -> log.info("  {} = {}", k, v));
+        log.info("Passphrase configured: {}", config.getPassphrase() != null && !config.getPassphrase().isEmpty() ? "YES (length: " + config.getPassphrase().length() + ")" : "NO");
+        
         // Generate signature
         String signature = PayFastSignatureService.generateSignature(params, config.getPassphrase());
         params.put("signature", signature);
@@ -74,7 +79,8 @@ public class PayFastPaymentProvider implements PaymentProvider {
         String checkoutUrl = config.getProcessUrl();
 
         log.info("PayFast: Generated checkout URL: {}", checkoutUrl);
-        log.info("PayFast: Signature: {}", signature);
+        log.info("PayFast: Generated signature: {}", signature);
+        log.info("=== END SIGNATURE GENERATION ===");
 
         // For PayFast, the providerReference isn't available until after payment
         // We use the invoiceId as a temporary reference

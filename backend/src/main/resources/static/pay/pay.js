@@ -77,20 +77,23 @@ async function startCheckout(invoiceId) {
     payBtn.disabled = true;
     payBtn.textContent = "Starting checkout…";
     try {
-      const { checkoutUrl, formParameters } = await startCheckout(invoiceId);
+      const { checkoutUrl, orderedFormParameters, formParameters } = await startCheckout(invoiceId);
       
-      // If formParameters exist, create and submit a form (for PayFast)
-      if (formParameters && Object.keys(formParameters).length > 0) {
+      // Use ordered parameters if available to preserve signature order, otherwise fall back to unordered
+      const params = orderedFormParameters || (formParameters ? Object.entries(formParameters).map(([name, value]) => ({name, value})) : null);
+      
+      // If parameters exist, create and submit a form (for PayFast)
+      if (params && params.length > 0) {
         const form = document.createElement("form");
         form.method = "POST";
         form.action = checkoutUrl;
         
-        // Add each parameter as a hidden input
-        for (const [key, value] of Object.entries(formParameters)) {
+        // Add each parameter as a hidden input IN ORDER
+        for (const param of params) {
           const input = document.createElement("input");
           input.type = "hidden";
-          input.name = key;
-          input.value = value;
+          input.name = param.name;
+          input.value = param.value;
           form.appendChild(input);
         }
         

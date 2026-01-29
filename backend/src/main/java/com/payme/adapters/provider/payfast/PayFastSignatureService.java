@@ -3,14 +3,11 @@ package com.payme.adapters.provider.payfast;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Service for generating and verifying PayFast MD5 signatures.
@@ -38,38 +35,46 @@ public class PayFastSignatureService {
         try {
             log.debug("=== SIGNATURE GENERATION START ===");
             log.debug("Input params keys (in order): {}", params.keySet());
-            params.forEach((k, v) -> log.debug("  {}: '{}' (trimmed: '{}')", k, v, v != null ? v.trim() : "null"));
+            params.forEach((k, v) -> log.debug("  {}: '{}'", k, v));
             
-            // Remove empty values (preserve insertion order) and trim
-            Map<String, String> filteredParams = params.entrySet().stream()
-                    .filter(entry -> entry.getValue() != null && !entry.getValue().trim().isEmpty())
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            entry -> entry.getValue().trim(),
-                            (v1, v2) -> v1,
-                            LinkedHashMap::new
-                    ));
-
-            log.debug("Filtered params keys (in order): {}", filteredParams.keySet());
+            // Build parameter string exactly as PHP does
+            StringBuilder pfOutput = new StringBuilder();
             
-            // Build query string with URL-encoded values
-            String queryString = filteredParams.entrySet().stream()
-                    .map(entry -> entry.getKey() + "=" + urlEncode(entry.getValue()))
-                    .collect(Collectors.joining("&"));
-
-            // Append passphrase if not empty
-            if (passphrase != null && !passphrase.isEmpty()) {
-                queryString += "&passphrase=" + urlEncode(passphrase);
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                String key = entry.getKey();
+                String val = entry.getValue();
+                
+                // Skip signature field
+                if ("signature".equals(key)) {
+                    continue;
+                }
+                
+                // PHP: if($val !== '') - check for non-empty after trimming
+                if (val != null && !val.trim().isEmpty()) {
+                    // PHP: $key .'='. urlencode( trim( $val ) ) .'&'
+                    pfOutput.append(key)
+                           .append("=")
+                           .append(urlEncode(val.trim()))
+                           .append("&");
+                }
             }
-
-            String maskedQuery = queryString.replace(passphrase != null ? passphrase : "", "***");
-            log.debug("Full signature string: {}", maskedQuery);
-            log.debug("=== SIGNATURE GENERATION END ==="
-
-            // Compute MD5 hash
+            
+            // Remove last ampersand (PHP: substr( $pfOutput, 0, -1 ))
+            String getString = pfOutput.length() > 0 
+                ? pfOutput.substring(0, pfOutput.length() - 1) 
+                : "";
+            
+            // Append passphrase if not null (PHP: if( $passPhrase !== null ))
+            if (passphrase != null && !passphrase.trim().isEmpty()) {
+                getString += "&passphrase=" + urlEncode(passphrase.trim());
+            }
+            
+            log.info("Signature string (before MD5): {}", getString);
+            
+            // Compute MD5 hash (PHP: md5( $getString ))
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] hash = md.digest(queryString.getBytes(StandardCharsets.UTF_8));
-
+            byte[] hash = md.digest(getString.getBytes(StandardCharsets.UTF_8));
+            
             // Convert to lowercase hex string
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
@@ -79,12 +84,13 @@ public class PayFastSignatureService {
                 }
                 hexString.append(hex);
             }
-
+            
             String signature = hexString.toString();
-            log.debug("Generated signature: {}", signature);
-
+            log.info("Generated MD5 signature: {}", signature);
+            log.debug("=== SIGNATURE GENERATION END ===");
+            
             return signature;
-
+            
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("MD5 algorithm not available", e);
         }
@@ -116,14 +122,11 @@ public class PayFastSignatureService {
      * @param value Value to encode
      * @return URL-encoded value
      */
-    private static String urlEncode(String value) {
+   private static String urlEncode(String value) {
         try {
-            String encoded = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
-                    .replace("+", "%20"); // PayFast expects %20 for spaces, not +
-            log.debug("URL Encoding: '{}' -> '{}'", value, encoded);
-            return encoded;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException("UTF-8 encoding not supported", e);
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

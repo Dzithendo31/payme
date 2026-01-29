@@ -1,11 +1,41 @@
 package com.payme.api.dto;
 
+import java.util.List;
 import java.util.Map;
 
 public class CheckoutResponse {
     private String checkoutUrl;
     private String attemptId;
     private Map<String, String> formParameters;
+    private List<FormParameter> orderedFormParameters;
+
+    public static class FormParameter {
+        private String name;
+        private String value;
+
+        public FormParameter() {}
+
+        public FormParameter(String name, String value) {
+            this.name = name;
+            this.value = value;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
 
     public CheckoutResponse() {
     }
@@ -43,5 +73,13 @@ public class CheckoutResponse {
 
     public void setFormParameters(Map<String, String> formParameters) {
         this.formParameters = formParameters;
+    }
+
+    public List<FormParameter> getOrderedFormParameters() {
+        return orderedFormParameters;
+    }
+
+    public void setOrderedFormParameters(List<FormParameter> orderedFormParameters) {
+        this.orderedFormParameters = orderedFormParameters;
     }
 }

@@ -71,6 +71,15 @@ public class PayController {
                 result.getAttemptId(),
                 result.getFormParameters()
         );
+        
+        // Convert form parameters to ordered list to preserve signature order
+        if (result.getFormParameters() != null && !result.getFormParameters().isEmpty()) {
+            java.util.List<CheckoutResponse.FormParameter> orderedParams = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, String> entry : result.getFormParameters().entrySet()) {
+                orderedParams.add(new CheckoutResponse.FormParameter(entry.getKey(), entry.getValue()));
+            }
+            response.setOrderedFormParameters(orderedParams);
+        }
 
         log.info("Checkout started successfully for invoice: {}, attempt: {}",
                 invoiceId, result.getAttemptId());
