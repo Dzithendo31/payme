@@ -9,7 +9,8 @@
       "WebFetch(domain:gopayfast.com)",
       "WebFetch(domain:github.com)",
       "Bash(git -C /c/Users/mathe/Videos/the-projects/payme log --oneline -15)",
-      "Bash(./mvnw test:*)"
+      "Bash(./mvnw test:*)",
+      "Bash(wc:*)"
     ]
   }
 }

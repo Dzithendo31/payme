@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 
+@Deprecated(forRemoval = true)
 @Service
 public class CreateInvoiceUseCase {
 

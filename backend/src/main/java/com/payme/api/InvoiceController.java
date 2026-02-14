@@ -2,27 +2,30 @@ package com.payme.api;
 
 import com.payme.api.dto.CreateInvoiceRequest;
 import com.payme.api.dto.InvoiceResponse;
-import com.payme.application.CreateInvoiceUseCase;
 import com.payme.application.GetInvoiceUseCase;
+import com.payme.application.commandhandler.CreateInvoiceCommandHandler;
 import com.payme.domain.Invoice;
+import com.payme.domain.command.CreateInvoiceCommand;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/invoices")
 public class InvoiceController {
 
-    private final CreateInvoiceUseCase createInvoiceUseCase;
+    private final CreateInvoiceCommandHandler createInvoiceCommandHandler;
     private final GetInvoiceUseCase getInvoiceUseCase;
 
     public InvoiceController(
-            CreateInvoiceUseCase createInvoiceUseCase,
+            CreateInvoiceCommandHandler createInvoiceCommandHandler,
             GetInvoiceUseCase getInvoiceUseCase
     ) {
-        this.createInvoiceUseCase = createInvoiceUseCase;
+        this.createInvoiceCommandHandler = createInvoiceCommandHandler;
         this.getInvoiceUseCase = getInvoiceUseCase;
     }
 
@@ -31,13 +34,15 @@ public class InvoiceController {
             @Valid @RequestBody CreateInvoiceRequest request,
             HttpServletRequest httpRequest
     ) {
-        Invoice invoice = createInvoiceUseCase.execute(
+        CreateInvoiceCommand cmd = new CreateInvoiceCommand(
+                UUID.randomUUID().toString(),
                 request.getMerchantId(),
                 request.getAmount(),
-                request.getCurrency(),
+                request.getCurrency().name(),
                 request.getDescription(),
                 request.getExpiryHours()
         );
+        Invoice invoice = createInvoiceCommandHandler.handle(cmd);
 
         String baseUrl = getBaseUrl(httpRequest);
         InvoiceResponse response = InvoiceResponse.fromDomain(invoice, baseUrl);
@@ -51,7 +56,7 @@ public class InvoiceController {
             HttpServletRequest httpRequest
     ) {
         Invoice invoice = getInvoiceUseCase.execute(invoiceId);
-        
+
         String baseUrl = getBaseUrl(httpRequest);
         InvoiceResponse response = InvoiceResponse.fromDomain(invoice, baseUrl);
 
@@ -64,7 +69,7 @@ public class InvoiceController {
         int serverPort = request.getServerPort();
 
         String portPart = "";
-        if ((scheme.equals("http") && serverPort != 80) || 
+        if ((scheme.equals("http") && serverPort != 80) ||
             (scheme.equals("https") && serverPort != 443)) {
             portPart = ":" + serverPort;
         }
