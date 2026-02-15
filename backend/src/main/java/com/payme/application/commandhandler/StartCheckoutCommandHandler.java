@@ -1,45 +1,55 @@
-package com.payme.application;
+package com.payme.application.commandhandler;
 
 import com.payme.domain.*;
+import com.payme.domain.command.StartCheckoutCommand;
+import com.payme.domain.event.InvoiceMarkedPending;
+import com.payme.domain.event.PaymentAttemptCreated;
 import com.payme.domain.exceptions.InvalidInvoiceStateException;
 import com.payme.domain.exceptions.InvoiceNotFoundException;
 import com.payme.ports.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 
-@Deprecated(forRemoval = true)
-@Service
-public class StartCheckoutUseCase {
+@Component
+public class StartCheckoutCommandHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(StartCheckoutUseCase.class);
+    private static final Logger log = LoggerFactory.getLogger(StartCheckoutCommandHandler.class);
 
     private final InvoiceRepository invoiceRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
     private final PaymentProvider paymentProvider;
     private final Clock clock;
     private final CheckoutUrls checkoutUrls;
+    private final EventStore eventStore;
+    private final EventPublisher eventPublisher;
 
-    public StartCheckoutUseCase(
+    public StartCheckoutCommandHandler(
             InvoiceRepository invoiceRepository,
             PaymentAttemptRepository paymentAttemptRepository,
             PaymentProvider paymentProvider,
             Clock clock,
-            CheckoutUrls checkoutUrls
+            CheckoutUrls checkoutUrls,
+            EventStore eventStore,
+            EventPublisher eventPublisher
     ) {
         this.invoiceRepository = invoiceRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.paymentProvider = paymentProvider;
         this.clock = clock;
         this.checkoutUrls = checkoutUrls;
+        this.eventStore = eventStore;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
-    public CheckoutResult execute(InvoiceId invoiceId) {
+    public CheckoutResult handle(StartCheckoutCommand cmd) {
         Instant now = clock.now();
+        InvoiceId invoiceId = new InvoiceId(cmd.invoiceId());
 
         log.info("Starting checkout for invoice: {}", invoiceId.getValue());
 
@@ -70,7 +80,7 @@ public class StartCheckoutUseCase {
         PaymentAttempt attempt = new PaymentAttempt(
                 attemptId,
                 invoiceId,
-                ProviderName.FAKE, // For now, hardcoded to FAKE
+                ProviderName.FAKE,
                 session.getProviderReference(),
                 PaymentAttemptStatus.PENDING,
                 now,
@@ -79,12 +89,34 @@ public class StartCheckoutUseCase {
         paymentAttemptRepository.save(attempt);
         log.info("Payment attempt saved: {}", attemptId.getValue());
 
-        // 6. Mark invoice as PENDING
+        // 6. Publish PaymentAttemptCreated event
+        var attemptCreatedEvent = new PaymentAttemptCreated(
+                UUID.randomUUID().toString(),
+                now,
+                attemptId.getValue(),
+                invoiceId.getValue(),
+                attempt.getProvider().name(),
+                session.getProviderReference()
+        );
+        eventStore.store(attemptCreatedEvent, "PaymentAttempt");
+        eventPublisher.publish(attemptCreatedEvent);
+
+        // 7. Mark invoice as PENDING
         invoice.markAsPending(now);
         invoiceRepository.save(invoice);
         log.info("Invoice marked as PENDING: {}", invoiceId.getValue());
 
-        // 7. Return checkout URL
+        // 8. Publish InvoiceMarkedPending event
+        var invoicePendingEvent = new InvoiceMarkedPending(
+                UUID.randomUUID().toString(),
+                now,
+                invoiceId.getValue(),
+                attemptId.getValue()
+        );
+        eventStore.store(invoicePendingEvent, "Invoice");
+        eventPublisher.publish(invoicePendingEvent);
+
+        // 9. Return checkout URL
         return new CheckoutResult(session.getCheckoutUrl(), attemptId.getValue());
     }
 

@@ -12,5 +12,15 @@ services:
     volumes:
       - payme_pgdata:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: payme-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - payme_redis_data:/data
+    command: redis-server --appendonly yes
+
 volumes:
   payme_pgdata:
+  payme_redis_data:

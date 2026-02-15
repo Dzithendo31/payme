@@ -1,7 +1,8 @@
 package com.payme.api;
 
-import com.payme.application.ProcessWebhookUseCase;
+import com.payme.application.commandhandler.ProcessWebhookCommandHandler;
 import com.payme.domain.ProviderName;
+import com.payme.domain.command.ProcessWebhookCommand;
 import com.payme.domain.exceptions.WebhookVerificationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -10,11 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/webhooks")
@@ -22,10 +22,10 @@ public class WebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
 
-    private final ProcessWebhookUseCase processWebhookUseCase;
+    private final ProcessWebhookCommandHandler processWebhookCommandHandler;
 
-    public WebhookController(ProcessWebhookUseCase processWebhookUseCase) {
-        this.processWebhookUseCase = processWebhookUseCase;
+    public WebhookController(ProcessWebhookCommandHandler processWebhookCommandHandler) {
+        this.processWebhookCommandHandler = processWebhookCommandHandler;
     }
 
     @PostMapping("/{provider}")
@@ -37,8 +37,8 @@ public class WebhookController {
         log.info("Received webhook for provider: {}", provider);
 
         try {
-            // Parse provider name
-            ProviderName providerName = ProviderName.valueOf(provider.toUpperCase());
+            // Parse provider name (validate early)
+            ProviderName.valueOf(provider.toUpperCase());
 
             // Extract headers and add source IP
             Map<String, String> headers = extractHeaders(request);
@@ -47,8 +47,14 @@ public class WebhookController {
 
             log.debug("Webhook source IP: {}", sourceIp);
 
-            // Process webhook
-            processWebhookUseCase.processWebhook(providerName, rawBody, headers);
+            // Dispatch command
+            ProcessWebhookCommand cmd = new ProcessWebhookCommand(
+                    UUID.randomUUID().toString(),
+                    provider.toUpperCase(),
+                    rawBody,
+                    headers
+            );
+            processWebhookCommandHandler.handle(cmd);
 
             log.info("Webhook processed successfully");
             return ResponseEntity.ok(Map.of("status", "success"));
@@ -81,17 +87,9 @@ public class WebhookController {
         return headers;
     }
 
-    /**
-     * Extracts the client IP address from the request.
-     * Considers X-Forwarded-For header for proxied requests.
-     *
-     * @param request HTTP request
-     * @return Client IP address
-     */
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // X-Forwarded-For can contain multiple IPs, take the first one
             return xForwardedFor.split(",")[0].trim();
         }
 

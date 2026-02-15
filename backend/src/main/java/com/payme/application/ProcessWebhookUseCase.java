@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 import java.util.Optional;
 
+@Deprecated(forRemoval = true)
 @Service
 public class ProcessWebhookUseCase {
 
