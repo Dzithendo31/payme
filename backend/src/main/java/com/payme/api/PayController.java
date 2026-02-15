@@ -3,14 +3,16 @@ package com.payme.api;
 import com.payme.api.dto.CheckoutResponse;
 import com.payme.api.dto.PayPageResponse;
 import com.payme.application.GetPayPageDataUseCase;
-import com.payme.application.StartCheckoutUseCase;
+import com.payme.application.commandhandler.StartCheckoutCommandHandler;
 import com.payme.domain.Invoice;
-import com.payme.domain.InvoiceId;
+import com.payme.domain.command.StartCheckoutCommand;
 import com.payme.ports.Clock;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/pay")
@@ -19,16 +21,16 @@ public class PayController {
     private static final Logger log = LoggerFactory.getLogger(PayController.class);
 
     private final GetPayPageDataUseCase getPayPageDataUseCase;
-    private final StartCheckoutUseCase startCheckoutUseCase;
+    private final StartCheckoutCommandHandler startCheckoutCommandHandler;
     private final Clock clock;
 
     public PayController(
             GetPayPageDataUseCase getPayPageDataUseCase,
-            StartCheckoutUseCase startCheckoutUseCase,
+            StartCheckoutCommandHandler startCheckoutCommandHandler,
             Clock clock
     ) {
         this.getPayPageDataUseCase = getPayPageDataUseCase;
-        this.startCheckoutUseCase = startCheckoutUseCase;
+        this.startCheckoutCommandHandler = startCheckoutCommandHandler;
         this.clock = clock;
     }
 
@@ -43,8 +45,11 @@ public class PayController {
     public ResponseEntity<CheckoutResponse> startCheckout(@PathVariable String invoiceId) {
         log.info("Received checkout request for invoice: {}", invoiceId);
 
-        InvoiceId id = new InvoiceId(invoiceId);
-        StartCheckoutUseCase.CheckoutResult result = startCheckoutUseCase.execute(id);
+        StartCheckoutCommand cmd = new StartCheckoutCommand(
+                UUID.randomUUID().toString(),
+                invoiceId
+        );
+        StartCheckoutCommandHandler.CheckoutResult result = startCheckoutCommandHandler.handle(cmd);
 
         CheckoutResponse response = new CheckoutResponse(
                 result.getCheckoutUrl(),

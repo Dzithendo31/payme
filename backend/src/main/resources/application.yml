@@ -14,6 +14,11 @@ spring:
       hibernate:
         format_sql: true
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
 management:
   endpoints:
     web:
@@ -23,6 +28,11 @@ management:
 payme:
   payment:
     provider: ${PAYMENT_PROVIDER:FAKE}
+  streams:
+    invoice-events: payme:events:invoice
+    payment-events: payme:events:payment
+    webhook-events: payme:events:webhook
+    consumer-group: payme-service
 
 payfast:
   merchant-id: ${PAYFAST_MERCHANT_ID}

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developers.payfast.co.za)",
+      "WebSearch",
+      "WebFetch(domain:www.deanmalan.co.za)",
+      "WebFetch(domain:payfast.kayako.com)",
+      "WebFetch(domain:njabulo.hashnode.dev)",
+      "WebFetch(domain:gopayfast.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(git -C /c/Users/mathe/Videos/the-projects/payme log --oneline -15)",
+      "Bash(./mvnw test:*)",
+      "Bash(wc:*)",
+      "Bash(./mvnw compile:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(mvn dependency:build-classpath:*)",
+      "Bash(tr:*)",
+      "Bash(jar tf:*)",
+      "Bash(javap:*)",
+      "Bash(jar xf:*)",
+      "Bash(mvn test:*)"
+    ]
+  }
+}
