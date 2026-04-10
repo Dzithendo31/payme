@@ -53,22 +53,97 @@ public class PayController {
 
     @GetMapping(value = "/success", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> paymentSuccess() {
-        return ResponseEntity.ok(
-                "<!DOCTYPE html>\n"
-                        + "<html lang=\"en\"><head><meta charset=\"UTF-8\"/><title>Payment successful</title></head>\n"
-                        + "<body><h1>Payment successful</h1>"
-                        + "<p>Thank you. Your payment has been received and is being processed.</p>"
-                        + "</body></html>\n");
+        return ResponseEntity.ok(renderResultPage(ResultPageVariant.SUCCESS));
     }
 
     @GetMapping(value = "/cancel", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> paymentCancelled() {
-        return ResponseEntity.ok(
-                "<!DOCTYPE html>\n"
-                        + "<html lang=\"en\"><head><meta charset=\"UTF-8\"/><title>Payment cancelled</title></head>\n"
-                        + "<body><h1>Payment cancelled</h1>"
-                        + "<p>Your payment was cancelled. You can try again from the merchant's checkout page.</p>"
-                        + "</body></html>\n");
+        return ResponseEntity.ok(renderResultPage(ResultPageVariant.CANCELLED));
+    }
+
+    /**
+     * @dec~ Two variants share enough markup that splitting them into separate
+     * render methods would mean copy-pasting 80 lines of HTML/CSS. The variant
+     * enum carries the per-page strings; everything else is identical.
+     */
+    private enum ResultPageVariant {
+        SUCCESS(
+                "Payment successful",
+                "Thank you — your payment has been received.",
+                "We're confirming it with your bank now. You can safely close this tab; the merchant's pay page will update automatically.",
+                "#16a34a", "#dcfce7",
+                // Inline check-circle icon
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\""
+                        + " stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\""
+                        + " stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/>"
+                        + "<polyline points=\"22 4 12 14.01 9 11.01\"/></svg>"
+        ),
+        CANCELLED(
+                "Payment cancelled",
+                "Your payment was not completed.",
+                "Nothing has been charged. You can return to the merchant's checkout page and try again, or try a different payment method.",
+                "#b91c1c", "#fee2e2",
+                // Inline x-circle icon
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\""
+                        + " stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\""
+                        + " stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/>"
+                        + "<line x1=\"15\" y1=\"9\" x2=\"9\" y2=\"15\"/>"
+                        + "<line x1=\"9\" y1=\"9\" x2=\"15\" y2=\"15\"/></svg>"
+        );
+
+        final String title;
+        final String headline;
+        final String body;
+        final String accentColor;
+        final String accentBg;
+        final String iconSvg;
+
+        ResultPageVariant(String title, String headline, String body,
+                          String accentColor, String accentBg, String iconSvg) {
+            this.title = title;
+            this.headline = headline;
+            this.body = body;
+            this.accentColor = accentColor;
+            this.accentBg = accentBg;
+            this.iconSvg = iconSvg;
+        }
+    }
+
+    private String renderResultPage(ResultPageVariant v) {
+        return ""
+                + "<!DOCTYPE html>\n"
+                + "<html lang=\"en\">\n"
+                + "<head>\n"
+                + "  <meta charset=\"UTF-8\"/>\n"
+                + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n"
+                + "  <title>PayMe — " + v.title + "</title>\n"
+                + "  <style>\n"
+                + "    body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;\n"
+                + "           background: #f8fafc; color: #0f172a; margin: 0; min-height: 100vh;\n"
+                + "           display: flex; align-items: center; justify-content: center; padding: 2rem; }\n"
+                + "    .card { background: white; border-radius: 16px; padding: 2.5rem 2rem; max-width: 440px;\n"
+                + "            width: 100%; box-shadow: 0 10px 40px rgba(15,23,42,0.08); text-align: center; }\n"
+                + "    .icon { width: 72px; height: 72px; border-radius: 50%; display: inline-flex;\n"
+                + "            align-items: center; justify-content: center; margin-bottom: 1.25rem;\n"
+                + "            background: " + v.accentBg + "; color: " + v.accentColor + "; }\n"
+                + "    .icon svg { width: 40px; height: 40px; }\n"
+                + "    h1 { font-size: 1.5rem; margin: 0 0 0.5rem 0; }\n"
+                + "    .headline { color: #334155; font-size: 1rem; margin: 0 0 1.25rem 0; }\n"
+                + "    .body { color: #64748b; font-size: 0.9rem; line-height: 1.55; margin: 0 0 1.5rem 0; }\n"
+                + "    .footer { font-size: 0.7rem; color: #94a3b8; margin-top: 0.5rem;\n"
+                + "              padding-top: 1.25rem; border-top: 1px solid #e2e8f0; }\n"
+                + "  </style>\n"
+                + "</head>\n"
+                + "<body>\n"
+                + "  <div class=\"card\">\n"
+                + "    <div class=\"icon\">" + v.iconSvg + "</div>\n"
+                + "    <h1>" + v.title + "</h1>\n"
+                + "    <p class=\"headline\">" + v.headline + "</p>\n"
+                + "    <p class=\"body\">" + v.body + "</p>\n"
+                + "    <div class=\"footer\">PayMe</div>\n"
+                + "  </div>\n"
+                + "</body>\n"
+                + "</html>\n";
     }
 
     @GetMapping("/{invoiceId}")
