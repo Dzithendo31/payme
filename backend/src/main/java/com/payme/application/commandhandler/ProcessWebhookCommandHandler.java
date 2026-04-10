@@ -15,12 +15,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * @dec(ARCH-001) Resolves verifier via registry — see decisions/ARCH-001.md
+ *
+ * Previously this handler injected a single {@link PaymentProvider} and
+ * silently ignored {@code cmd.provider()}, which meant a PayShap webhook
+ * would have been verified against PayFast's parser. Now it routes the
+ * raw payload to the verifier matching the path-param provider.
+ */
 @Component
 public class ProcessWebhookCommandHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ProcessWebhookCommandHandler.class);
 
-    private final PaymentProvider paymentProvider;
+    private final PaymentProviderRegistry providerRegistry;
     private final WebhookEventRepository webhookEventRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
     private final InvoiceRepository invoiceRepository;
@@ -30,7 +38,7 @@ public class ProcessWebhookCommandHandler {
     private final EventPublisher eventPublisher;
 
     public ProcessWebhookCommandHandler(
-            PaymentProvider paymentProvider,
+            PaymentProviderRegistry providerRegistry,
             WebhookEventRepository webhookEventRepository,
             PaymentAttemptRepository paymentAttemptRepository,
             InvoiceRepository invoiceRepository,
@@ -39,7 +47,7 @@ public class ProcessWebhookCommandHandler {
             EventStore eventStore,
             EventPublisher eventPublisher
     ) {
-        this.paymentProvider = paymentProvider;
+        this.providerRegistry = providerRegistry;
         this.webhookEventRepository = webhookEventRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.invoiceRepository = invoiceRepository;
@@ -56,6 +64,9 @@ public class ProcessWebhookCommandHandler {
         Map<String, String> headers = cmd.headers();
 
         log.info("Processing webhook for provider: {}", provider);
+
+        // @dec(ARCH-001) verifier is rail-specific; resolve from the registry
+        PaymentProvider paymentProvider = providerRegistry.get(provider);
 
         // Step 1: Compute payload hash for deduplication
         String payloadHash = hashService.sha256(rawBody);

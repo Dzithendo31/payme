@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,6 +26,7 @@ class StartCheckoutCommandHandlerTest {
     private StubInvoiceRepository invoiceRepository;
     private StubPaymentAttemptRepository paymentAttemptRepository;
     private StubPaymentProvider paymentProvider;
+    private StubProviderRegistry providerRegistry;
     private StubClock clock;
     private CheckoutUrls checkoutUrls;
     private CapturingEventStore eventStore;
@@ -38,13 +40,14 @@ class StartCheckoutCommandHandlerTest {
         invoiceRepository = new StubInvoiceRepository();
         paymentAttemptRepository = new StubPaymentAttemptRepository();
         paymentProvider = new StubPaymentProvider();
+        providerRegistry = new StubProviderRegistry(paymentProvider, ProviderName.FAKE);
         clock = new StubClock(FIXED_TIME);
         checkoutUrls = new CheckoutUrls("http://localhost/success", "http://localhost/cancel");
         eventStore = new CapturingEventStore();
         eventPublisher = new CapturingEventPublisher();
         handler = new StartCheckoutCommandHandler(
-                invoiceRepository, paymentAttemptRepository, paymentProvider,
-                clock, checkoutUrls, eventStore, eventPublisher, "FAKE"
+                invoiceRepository, paymentAttemptRepository, providerRegistry,
+                clock, checkoutUrls, eventStore, eventPublisher
         );
     }
 
@@ -66,7 +69,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         StartCheckoutCommandHandler.CheckoutResult result = handler.handle(cmd);
 
         assertNotNull(result.getCheckoutUrl());
@@ -79,7 +82,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         assertEquals(1, paymentAttemptRepository.savedAttempts.size());
@@ -93,7 +96,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         // Invoice should be saved twice: once original lookup creates it, once after marking pending
@@ -106,7 +109,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         assertEquals(2, eventPublisher.publishedEvents.size());
@@ -125,7 +128,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         assertEquals(2, eventStore.storedEvents.size());
@@ -138,7 +141,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         for (int i = 0; i < eventStore.storedEvents.size(); i++) {
@@ -148,7 +151,7 @@ class StartCheckoutCommandHandlerTest {
 
     @Test
     void handle_throwsWhenInvoiceNotFound() {
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "non-existent");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "non-existent");
 
         assertThrows(InvoiceNotFoundException.class, () -> handler.handle(cmd));
     }
@@ -167,7 +170,7 @@ class StartCheckoutCommandHandlerTest {
         );
         invoiceRepository.addInvoice(expiredInvoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-expired");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-expired");
 
         InvalidInvoiceStateException ex = assertThrows(
                 InvalidInvoiceStateException.class, () -> handler.handle(cmd));
@@ -188,7 +191,7 @@ class StartCheckoutCommandHandlerTest {
         );
         invoiceRepository.addInvoice(paidInvoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-paid");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-paid");
 
         InvalidInvoiceStateException ex = assertThrows(
                 InvalidInvoiceStateException.class, () -> handler.handle(cmd));
@@ -200,7 +203,7 @@ class StartCheckoutCommandHandlerTest {
         Invoice invoice = createPayableInvoice("inv-1");
         invoiceRepository.addInvoice(invoice);
 
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-1", "inv-1");
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-1", "inv-1");
         handler.handle(cmd);
 
         PaymentAttemptCreated attemptEvent = (PaymentAttemptCreated) eventPublisher.publishedEvents.get(0);
@@ -281,6 +284,34 @@ class StartCheckoutCommandHandlerTest {
         @Override
         public CanonicalPaymentEvent verifyAndParseWebhook(String rawBody, java.util.Map<String, String> headers) {
             throw new UnsupportedOperationException("Not used in checkout tests");
+        }
+    }
+
+    private static class StubProviderRegistry implements PaymentProviderRegistry {
+        private final PaymentProvider provider;
+        private final ProviderName defaultProvider;
+
+        StubProviderRegistry(PaymentProvider provider, ProviderName defaultProvider) {
+            this.provider = provider;
+            this.defaultProvider = defaultProvider;
+        }
+
+        @Override
+        public PaymentProvider get(ProviderName name) {
+            if (name != defaultProvider) {
+                throw new UnknownProviderException("Stub registry only knows about " + defaultProvider);
+            }
+            return provider;
+        }
+
+        @Override
+        public Set<ProviderName> available() {
+            return Set.of(defaultProvider);
+        }
+
+        @Override
+        public ProviderName defaultProvider() {
+            return defaultProvider;
         }
     }
 
