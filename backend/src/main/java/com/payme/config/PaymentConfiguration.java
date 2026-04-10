@@ -111,6 +111,10 @@ public class PaymentConfiguration {
         // hosted-checkout page, and surfacing the problem at startup is
         // strictly more honest. See validatePayFastCredentials below.
         if (payFastEnabled) {
+            // @dec~ sanitize first (mutates), then validate (pure). Splitting
+            // these means a future caller can validate without surprise side
+            // effects, and the read-only validator is easy to unit-test.
+            sanitizePayFastConfig(payFastConfig);
             validatePayFastCredentials(payFastConfig);
             providers.put(
                     ProviderName.PAYFAST,
@@ -155,10 +159,27 @@ public class PaymentConfiguration {
     }
 
     /**
-     * Validates PayFast credentials at startup. Refuses to register the
-     * provider with values that PayFast itself would reject — surfacing the
-     * problem here is strictly more honest than letting the customer hit
-     * "merchant_id must be 8 digits" on PayFast's hosted page.
+     * Pre-validation cleanup: clears the passphrase field if it looks like an
+     * unresolved {@code ${VAR}} placeholder so the literal text never reaches
+     * the signature computation. This is the only place we mutate
+     * {@link PayFastConfig}; keeping it separate from validation means the
+     * validator itself is pure and easy to reason about.
+     */
+    private void sanitizePayFastConfig(PayFastConfig config) {
+        String passphrase = config.getPassphrase();
+        if (passphrase != null && passphrase.startsWith("${") && passphrase.endsWith("}")) {
+            log.warn("PayFast passphrase looks like an unresolved placeholder ({}); treating as unset",
+                    passphrase);
+            config.setPassphrase(null);
+        }
+    }
+
+    /**
+     * Validates PayFast credentials at startup. Pure — does not mutate
+     * {@code config}. Refuses to register the provider with values that
+     * PayFast itself would reject — surfacing the problem here is strictly
+     * more honest than letting the customer hit "merchant_id must be 8 digits"
+     * on PayFast's hosted page.
      *
      * @dec~ Rules mirror PayFast's own format errors: merchant_id is exactly
      * 8 digits, merchant_key is exactly 13 characters. Also catches the
@@ -174,15 +195,6 @@ public class PaymentConfiguration {
         validateField(errors, "merchant_key", config.getMerchantKey(), "PAYFAST_MERCHANT_KEY",
                 v -> v.length() == 13, "must be exactly 13 characters");
 
-        // passphrase is optional, but if it's a literal placeholder we want to clear it
-        // so it doesn't get fed into the signature computation as raw text.
-        String passphrase = config.getPassphrase();
-        if (passphrase != null && passphrase.startsWith("${") && passphrase.endsWith("}")) {
-            log.warn("PayFast passphrase looks like an unresolved placeholder ({}); treating as unset",
-                    passphrase);
-            config.setPassphrase(null);
-        }
-
         if (!errors.isEmpty()) {
             String banner = "=".repeat(72);
             throw new IllegalStateException(
@@ -190,11 +202,12 @@ public class PaymentConfiguration {
                             + "PayFast credentials are invalid. The application cannot start.\n\n"
                             + String.join("\n", errors) + "\n\n"
                             + "Fix options:\n"
-                            + "  1. Export PayFast env vars in your shell or .env file:\n"
-                            + "       export PAYFAST_MERCHANT_ID=10000100\n"
-                            + "       export PAYFAST_MERCHANT_KEY=46f0cd694581a\n"
-                            + "       export PAYFAST_PASSPHRASE=jt7NOE43FZPn   # optional\n"
-                            + "     (the values above are PayFast's public sandbox test credentials)\n\n"
+                            + "  1. Set the following env vars in your shell or .env file:\n"
+                            + "       PAYFAST_MERCHANT_ID    (8 digits)\n"
+                            + "       PAYFAST_MERCHANT_KEY   (13 characters)\n"
+                            + "       PAYFAST_PASSPHRASE     (optional)\n"
+                            + "     PayFast publishes sandbox test credentials in their developer\n"
+                            + "     documentation: https://developers.payfast.co.za/docs\n\n"
                             + "  2. Or disable PayFast for this environment:\n"
                             + "       export PAYFAST_ENABLED=false\n"
                             + "     The pay page will only show PayShap.\n"
