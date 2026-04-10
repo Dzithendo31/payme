@@ -68,8 +68,13 @@ class EventHandlerIntegrationTest {
         }
 
         @Bean
-        public InvoiceEventHandler invoiceEventHandler() {
-            return new InvoiceEventHandler();
+        public com.payme.api.sse.InvoiceSseHub invoiceSseHub() {
+            return new com.payme.api.sse.InvoiceSseHub();
+        }
+
+        @Bean
+        public InvoiceEventHandler invoiceEventHandler(com.payme.api.sse.InvoiceSseHub sseHub) {
+            return new InvoiceEventHandler(sseHub);
         }
 
         @Bean

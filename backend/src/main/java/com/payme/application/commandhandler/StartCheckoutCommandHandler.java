@@ -9,13 +9,20 @@ import com.payme.domain.exceptions.InvoiceNotFoundException;
 import com.payme.ports.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * @dec(ARCH-001) Resolves the payment provider via the registry — see decisions/ARCH-001.md
+ *
+ * Previously this handler held a single {@link PaymentProvider} instance and a
+ * {@code @Value} injected provider name. Both are gone: the handler now asks
+ * the {@link PaymentProviderRegistry} for the rail named on the command, and
+ * falls back to the registry's default when the command leaves it null.
+ */
 @Component
 public class StartCheckoutCommandHandler {
 
@@ -23,31 +30,28 @@ public class StartCheckoutCommandHandler {
 
     private final InvoiceRepository invoiceRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
-    private final PaymentProvider paymentProvider;
+    private final PaymentProviderRegistry providerRegistry;
     private final Clock clock;
     private final CheckoutUrls checkoutUrls;
     private final EventStore eventStore;
     private final EventPublisher eventPublisher;
-    private final ProviderName providerName;
 
     public StartCheckoutCommandHandler(
             InvoiceRepository invoiceRepository,
             PaymentAttemptRepository paymentAttemptRepository,
-            PaymentProvider paymentProvider,
+            PaymentProviderRegistry providerRegistry,
             Clock clock,
             CheckoutUrls checkoutUrls,
             EventStore eventStore,
-            EventPublisher eventPublisher,
-            @Value("${payme.payment.provider:FAKE}") String providerName
+            EventPublisher eventPublisher
     ) {
         this.invoiceRepository = invoiceRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
-        this.paymentProvider = paymentProvider;
+        this.providerRegistry = providerRegistry;
         this.clock = clock;
         this.checkoutUrls = checkoutUrls;
         this.eventStore = eventStore;
         this.eventPublisher = eventPublisher;
-        this.providerName = ProviderName.valueOf(providerName.toUpperCase());
     }
 
     @Transactional
@@ -55,7 +59,14 @@ public class StartCheckoutCommandHandler {
         Instant now = clock.now();
         InvoiceId invoiceId = new InvoiceId(cmd.invoiceId());
 
-        log.info("Starting checkout for invoice: {}", invoiceId.getValue());
+        // @dec(ARCH-001) null provider on the command means "use the env default"
+        ProviderName chosenProvider = cmd.provider() != null
+                ? cmd.provider()
+                : providerRegistry.defaultProvider();
+        PaymentProvider paymentProvider = providerRegistry.get(chosenProvider);
+
+        log.info("Starting checkout for invoice {} via provider {}",
+                invoiceId.getValue(), chosenProvider);
 
         // 1. Fetch invoice
         Invoice invoice = invoiceRepository.findById(invoiceId)
@@ -84,7 +95,7 @@ public class StartCheckoutCommandHandler {
         PaymentAttempt attempt = new PaymentAttempt(
                 attemptId,
                 invoiceId,
-                providerName,
+                chosenProvider,
                 session.getProviderReference(),
                 PaymentAttemptStatus.PENDING,
                 now,

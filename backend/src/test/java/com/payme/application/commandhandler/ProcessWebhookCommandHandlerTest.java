@@ -39,8 +39,10 @@ class ProcessWebhookCommandHandlerTest {
         clock = new StubClock(FIXED_TIME);
         eventStore = new CapturingEventStore();
         eventPublisher = new CapturingEventPublisher();
+        // @dec(ARCH-001) Handler now resolves verifier via registry — wrap the stub
+        PaymentProviderRegistry registry = new StubProviderRegistry(paymentProvider);
         handler = new ProcessWebhookCommandHandler(
-                paymentProvider, webhookEventRepository, paymentAttemptRepository,
+                registry, webhookEventRepository, paymentAttemptRepository,
                 invoiceRepository, hashService, clock, eventStore, eventPublisher
         );
     }
@@ -411,6 +413,29 @@ class ProcessWebhookCommandHandlerTest {
     }
 
     // --- Test doubles ---
+
+    private static class StubProviderRegistry implements PaymentProviderRegistry {
+        private final PaymentProvider provider;
+
+        StubProviderRegistry(PaymentProvider provider) {
+            this.provider = provider;
+        }
+
+        @Override
+        public PaymentProvider get(ProviderName name) {
+            return provider;
+        }
+
+        @Override
+        public Set<ProviderName> available() {
+            return Set.of(ProviderName.FAKE);
+        }
+
+        @Override
+        public ProviderName defaultProvider() {
+            return ProviderName.FAKE;
+        }
+    }
 
     private static class StubPaymentProvider implements PaymentProvider {
         private CanonicalPaymentEvent canonicalEvent;

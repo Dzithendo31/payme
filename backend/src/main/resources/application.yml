@@ -28,6 +28,15 @@ management:
 payme:
   payment:
     provider: ${PAYMENT_PROVIDER:FAKE}
+  payfast:
+    # Set to false to skip PayFast registration entirely (demo runs PayShap-only).
+    # When true, PAYFAST_MERCHANT_ID and PAYFAST_MERCHANT_KEY must be set or
+    # the application will fail fast at startup with a clear error.
+    enabled: ${PAYFAST_ENABLED:true}
+  payshap:
+    # mock | stitch | off — see decisions/INT-001.md
+    mode: ${PAYSHAP_MODE:mock}
+    mock-base-url: ${PAYSHAP_MOCK_BASE_URL:http://localhost:8080}
   streams:
     invoice-events: payme:events:invoice
     payment-events: payme:events:payment
@@ -35,9 +44,9 @@ payme:
     consumer-group: payme-service
 
 payfast:
-  merchant-id: ${PAYFAST_MERCHANT_ID}
-  merchant-key: ${PAYFAST_MERCHANT_KEY}
-  passphrase: ${PAYFAST_PASSPHRASE}
+  merchant-id: ${PAYFAST_MERCHANT_ID:}
+  merchant-key: ${PAYFAST_MERCHANT_KEY:}
+  passphrase: ${PAYFAST_PASSPHRASE:}
   sandbox: ${PAYFAST_SANDBOX:true}
   notify-url: ${PAYFAST_NOTIFY_URL:http://localhost:8080/webhooks/PAYFAST}
   allowed-ips: 197.97.145.144,197.97.145.145,197.97.145.146,197.97.145.147,197.97.145.148,197.97.145.149,197.97.145.150,197.97.145.151

@@ -1,5 +1,6 @@
 package com.payme.application.eventhandler;
 
+import com.payme.api.sse.InvoiceSseHub;
 import com.payme.domain.event.InvoiceCreated;
 import com.payme.domain.event.InvoiceExpired;
 import com.payme.domain.event.InvoiceMarkedPending;
@@ -22,7 +23,8 @@ class InvoiceEventHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new InvoiceEventHandler();
+        // Real hub instance is fine — without subscribers, publish() is a no-op.
+        handler = new InvoiceEventHandler(new InvoiceSseHub());
     }
 
     @Test

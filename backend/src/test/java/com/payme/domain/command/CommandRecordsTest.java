@@ -1,5 +1,6 @@
 package com.payme.domain.command;
 
+import com.payme.domain.ProviderName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -51,7 +52,7 @@ class CommandRecordsTest {
 
     @Test
     void startCheckoutCommand_implementsCommand() {
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-2", "inv-1");
+        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-2", "inv-1", ProviderName.PAYFAST);
 
         assertInstanceOf(Command.class, cmd);
         assertEquals("cmd-2", cmd.commandId());
@@ -59,18 +60,27 @@ class CommandRecordsTest {
 
     @Test
     void startCheckoutCommand_exposesAllFields() {
-        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-2", "inv-1");
+        StartCheckoutCommand cmd = new StartCheckoutCommand("cmd-2", "inv-1", ProviderName.PAYFAST);
 
         assertEquals("inv-1", cmd.invoiceId());
+        assertEquals(ProviderName.PAYFAST, cmd.provider());
     }
 
     @Test
     void startCheckoutCommand_equalityByFields() {
-        StartCheckoutCommand a = new StartCheckoutCommand("cmd-2", "inv-1");
-        StartCheckoutCommand b = new StartCheckoutCommand("cmd-2", "inv-1");
+        StartCheckoutCommand a = new StartCheckoutCommand("cmd-2", "inv-1", ProviderName.PAYFAST);
+        StartCheckoutCommand b = new StartCheckoutCommand("cmd-2", "inv-1", ProviderName.PAYFAST);
 
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
+    }
+
+    @Test
+    void startCheckoutCommand_withDefaultProviderLeavesProviderNull() {
+        StartCheckoutCommand cmd = StartCheckoutCommand.withDefaultProvider("cmd-2", "inv-1");
+
+        assertNull(cmd.provider());
+        assertEquals("inv-1", cmd.invoiceId());
     }
 
     // --- ProcessWebhookCommand ---
