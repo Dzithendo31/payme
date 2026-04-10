@@ -9,19 +9,27 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
  * Service for generating and verifying PayFast MD5 signatures.
- * 
+ *
  * PayFast signature requirements:
- * 1. Remove empty values from parameters
- * 2. Sort parameters alphabetically by key
- * 3. Build query string with URL-encoded values
- * 4. Append passphrase if not empty
- * 5. Compute MD5 hash
- * 6. Return lowercase hex string
+ * 1. Iterate parameters in their original (insertion) order — DO NOT sort.
+ *    PayFast's reference PHP implementation iterates the form data array as-is,
+ *    so the caller must pass parameters in PayFast's documented field order.
+ * 2. Skip the 'signature' field itself.
+ * 3. Include ALL fields, even those with empty values (PayFast's ITN sends
+ *    `item_description=&custom_str2=&...` and includes them in the signature).
+ *    Only null values are skipped.
+ * 4. URL-encode each value using PHP urlencode() semantics
+ *    (uppercase hex, spaces as '+').
+ * 5. Join key=value pairs with '&'.
+ * 6. Append '&passphrase=<encoded>' if a passphrase is configured.
+ * 7. MD5 the resulting string and return lowercase hex.
+ *
+ * Callers MUST provide a Map with predictable iteration order
+ * (e.g. LinkedHashMap) so the signature is reproducible.
  */
 public class PayFastSignatureService {
 
@@ -30,24 +38,19 @@ public class PayFastSignatureService {
     /**
      * Generates MD5 signature for PayFast request parameters.
      *
-     * @param params     Map of parameters (will not be modified)
+     * @param params     Map of parameters in PayFast's expected order (will not be modified)
      * @param passphrase Optional passphrase (can be null or empty)
      * @return MD5 signature as lowercase hex string
      */
     public static String generateSignature(Map<String, String> params, String passphrase) {
         try {
-            // Remove empty values and sort alphabetically
-            TreeMap<String, String> sortedParams = params.entrySet().stream()
-                    .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            Map.Entry::getValue,
-                            (v1, v2) -> v1,
-                            TreeMap::new
-                    ));
-
-            // Build query string with URL-encoded values
-            String queryString = sortedParams.entrySet().stream()
+            // Build query string in the caller's iteration order (PayFast does NOT sort).
+            // Skip the signature field itself and null values, but INCLUDE empty strings:
+            // PayFast's ITN sends fields like `item_description=&custom_str2=` and uses
+            // them in its signature computation, so we must too.
+            String queryString = params.entrySet().stream()
+                    .filter(entry -> !"signature".equals(entry.getKey()))
+                    .filter(entry -> entry.getValue() != null)
                     .map(entry -> entry.getKey() + "=" + urlEncode(entry.getValue()))
                     .collect(Collectors.joining("&"));
 
@@ -103,15 +106,18 @@ public class PayFastSignatureService {
 
     /**
      * URL-encodes a value for use in signature generation.
-     * PayFast requires standard URL encoding.
+     *
+     * PayFast's signature algorithm requires PHP urlencode()-compatible encoding:
+     * uppercase hex and spaces as '+' (NOT %20). Java's URLEncoder.encode()
+     * (application/x-www-form-urlencoded) already produces this format, so we use it as-is.
+     * See https://developers.payfast.co.za/documentation/#checkout-page
      *
      * @param value Value to encode
      * @return URL-encoded value
      */
     private static String urlEncode(String value) {
         try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
-                    .replace("+", "%20"); // PayFast expects %20 for spaces, not +
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException("UTF-8 encoding not supported", e);
         }

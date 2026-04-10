@@ -1,0 +1,25 @@
+meta {
+  name: Webhook-FAKE
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{payme-url}}/webhooks/FAKE
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "eventId": "d9629634-a779-4e0e-b951-ab104d10b15c",
+    "type": "payment.succeeded",
+    "reference": "{{attemptId}}",
+    "invoiceId": "{{invoiceId}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

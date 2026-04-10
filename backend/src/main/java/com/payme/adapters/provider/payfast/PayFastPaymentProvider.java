@@ -16,8 +16,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -49,29 +49,36 @@ public class PayFastPaymentProvider implements PaymentProvider {
         log.info("PayFast: Creating checkout session for invoice {} and attempt {}",
                 invoice.getInvoiceId().getValue(), attemptId.getValue());
 
-        // Build payment parameters
+        // Build payment parameters in PayFast's documented field order.
+        // The signature is computed by iterating this map in insertion order, so the
+        // order below MUST match PayFast's expected order:
+        //   merchant_id, merchant_key, return_url, cancel_url, notify_url,
+        //   [billing fields], m_payment_id, amount, item_name, item_description,
+        //   custom_str1..5, custom_int1..5, ...
         Map<String, String> params = new LinkedHashMap<>();
+        // Merchant details
         params.put("merchant_id", config.getMerchantId());
         params.put("merchant_key", config.getMerchantKey());
         params.put("return_url", urls.getSuccessUrl());
         params.put("cancel_url", urls.getCancelUrl());
         params.put("notify_url", config.getNotifyUrl());
-        
-        // Amount must be formatted to 2 decimal places
-        params.put("amount", String.format("%.2f", invoice.getMoney().getAmount()));
-        params.put("item_name", invoice.getDescription());
-        
-        // Custom fields for correlation
+
+        // Item details (m_payment_id MUST come before amount per PayFast's spec)
         params.put("m_payment_id", invoice.getInvoiceId().getValue());
+        // Amount must be formatted to 2 decimal places with a period as the decimal separator.
+        // Locale.US forces a period regardless of the JVM's default locale.
+        params.put("amount", String.format(Locale.US, "%.2f", invoice.getMoney().getAmount()));
+        params.put("item_name", invoice.getDescription());
+
+        // Custom fields for correlation
         params.put("custom_str1", attemptId.getValue());
 
         // Generate signature
         String signature = PayFastSignatureService.generateSignature(params, config.getPassphrase());
         params.put("signature", signature);
 
-        // The checkout URL is the PayFast process endpoint
-        // In a real implementation, we'd need to submit a form with these parameters
-        // For now, we return the URL and parameters - the frontend will need to POST them
+        // PayFast uses a hosted checkout: the client must POST these signed params
+        // to the process URL. We return both so the API caller can render a form.
         String checkoutUrl = config.getProcessUrl();
 
         log.info("PayFast: Generated checkout URL: {}", checkoutUrl);
@@ -81,7 +88,7 @@ public class PayFastPaymentProvider implements PaymentProvider {
         // We use the invoiceId as a temporary reference
         String providerReference = "payfast_" + invoice.getInvoiceId().getValue();
 
-        return new CheckoutSession(checkoutUrl, providerReference);
+        return new CheckoutSession(checkoutUrl, providerReference, params);
     }
 
     @Override
@@ -160,7 +167,9 @@ public class PayFastPaymentProvider implements PaymentProvider {
      * @return Map of parameters
      */
     private Map<String, String> parseFormEncodedBody(String body) {
-        Map<String, String> params = new HashMap<>();
+        // LinkedHashMap preserves PayFast's send order, which is required to
+        // reproduce the signature input string for ITN verification.
+        Map<String, String> params = new LinkedHashMap<>();
 
         if (body == null || body.isEmpty()) {
             return params;

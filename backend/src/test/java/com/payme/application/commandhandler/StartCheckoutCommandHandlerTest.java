@@ -44,7 +44,7 @@ class StartCheckoutCommandHandlerTest {
         eventPublisher = new CapturingEventPublisher();
         handler = new StartCheckoutCommandHandler(
                 invoiceRepository, paymentAttemptRepository, paymentProvider,
-                clock, checkoutUrls, eventStore, eventPublisher
+                clock, checkoutUrls, eventStore, eventPublisher, "FAKE"
         );
     }
 

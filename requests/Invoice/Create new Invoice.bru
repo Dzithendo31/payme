@@ -1,0 +1,52 @@
+meta {
+  name: Create new Invoice
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{payme-url}}/api/invoices
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "merchantId": "10045076",
+    "amount": 99.99,
+    "currency": "USD",
+    "description": "Payment for services rendered",
+    "expiryHours": 24
+  }
+}
+
+script:post-response {
+  // Bruno: Post-response / Tests script
+  
+  // res.body can be a string OR an object. Handle both safely.
+  const body = (typeof res.body === 'string') ? JSON.parse(res.body) : res.body;
+  
+  // Try a few common locations for invoiceId (adjust as needed)
+  const invoiceId =
+    body?.invoiceId ??
+    body?.invoice?.invoiceId ??
+    body?.invoice?.id ??
+    body?.data?.invoiceId ??
+    body?.data?.invoice?.id;
+  
+  if (!invoiceId) {
+    console.log('Response body:', body);
+    throw new Error('invoiceId not found in response (check the logged body shape)');
+  }
+  
+  // Save to collection variables
+  bru.setVar('invoiceId', String(invoiceId));
+  
+  console.log('Saved invoiceId (collection var):', invoiceId);
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

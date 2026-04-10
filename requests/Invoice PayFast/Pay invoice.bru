@@ -1,0 +1,16 @@
+meta {
+  name: Pay invoice
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{payme-url}}/pay/{{invoiceId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
