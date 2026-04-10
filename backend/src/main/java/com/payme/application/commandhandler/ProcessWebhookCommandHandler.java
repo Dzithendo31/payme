@@ -226,8 +226,17 @@ public class ProcessWebhookCommandHandler {
     }
 
     private PaymentAttempt findPaymentAttempt(CanonicalPaymentEvent event) {
+        // PayFast stores attemptId in custom_str1, which comes back as attemptReference
         if (event.getAttemptReference() != null && !event.getAttemptReference().isEmpty()) {
-            Optional<PaymentAttempt> attemptOpt = paymentAttemptRepository.findByProviderReference(event.getAttemptReference());
+            // First try to find by attemptId (custom_str1 carries the attemptId)
+            Optional<PaymentAttempt> attemptOpt = paymentAttemptRepository.findById(
+                    new PaymentAttemptId(event.getAttemptReference()));
+            if (attemptOpt.isPresent()) {
+                return attemptOpt.get();
+            }
+
+            // Fallback: try by providerReference
+            attemptOpt = paymentAttemptRepository.findByProviderReference(event.getAttemptReference());
             if (attemptOpt.isPresent()) {
                 return attemptOpt.get();
             }

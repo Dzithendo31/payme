@@ -1,0 +1,41 @@
+meta {
+  name: Checkout
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{payme-url}}/pay/{{invoiceId}}/checkout
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  // Bruno: Post-response / Tests script
+  
+  // res.body can be a string OR an object. Handle both safely.
+  const body = (typeof res.body === 'string') ? JSON.parse(res.body) : res.body;
+  
+  // Try a few common locations for invoiceId (adjust as needed)
+  const attemptId =
+    body?.attemptId ??
+    body?.attemptId?.attemptId ??
+    body?.attempt?.id ??
+    body?.data?.attemptId ??
+    body?.data?.attempt?.id;
+  
+  if (!attemptId) {
+    console.log('Response body:', body);
+    throw new Error('attemptId not found in response (check the logged body shape)');
+  }
+  
+  // Save to collection variables
+  bru.setVar('attemptId', String(attemptId));
+  
+  console.log('Saved attemptId (collection var):', attemptId);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

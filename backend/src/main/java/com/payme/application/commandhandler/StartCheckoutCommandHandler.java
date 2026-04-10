@@ -9,6 +9,7 @@ import com.payme.domain.exceptions.InvoiceNotFoundException;
 import com.payme.ports.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,7 @@ public class StartCheckoutCommandHandler {
     private final CheckoutUrls checkoutUrls;
     private final EventStore eventStore;
     private final EventPublisher eventPublisher;
+    private final ProviderName providerName;
 
     public StartCheckoutCommandHandler(
             InvoiceRepository invoiceRepository,
@@ -35,7 +37,8 @@ public class StartCheckoutCommandHandler {
             Clock clock,
             CheckoutUrls checkoutUrls,
             EventStore eventStore,
-            EventPublisher eventPublisher
+            EventPublisher eventPublisher,
+            @Value("${payme.payment.provider:FAKE}") String providerName
     ) {
         this.invoiceRepository = invoiceRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
@@ -44,6 +47,7 @@ public class StartCheckoutCommandHandler {
         this.checkoutUrls = checkoutUrls;
         this.eventStore = eventStore;
         this.eventPublisher = eventPublisher;
+        this.providerName = ProviderName.valueOf(providerName.toUpperCase());
     }
 
     @Transactional
@@ -80,7 +84,7 @@ public class StartCheckoutCommandHandler {
         PaymentAttempt attempt = new PaymentAttempt(
                 attemptId,
                 invoiceId,
-                ProviderName.FAKE,
+                providerName,
                 session.getProviderReference(),
                 PaymentAttemptStatus.PENDING,
                 now,
@@ -117,16 +121,18 @@ public class StartCheckoutCommandHandler {
         eventPublisher.publish(invoicePendingEvent);
 
         // 9. Return checkout URL
-        return new CheckoutResult(session.getCheckoutUrl(), attemptId.getValue());
+        return new CheckoutResult(session.getCheckoutUrl(), attemptId.getValue(), session.getFormParams());
     }
 
     public static class CheckoutResult {
         private final String checkoutUrl;
         private final String attemptId;
+        private final java.util.Map<String, String> formParams;
 
-        public CheckoutResult(String checkoutUrl, String attemptId) {
+        public CheckoutResult(String checkoutUrl, String attemptId, java.util.Map<String, String> formParams) {
             this.checkoutUrl = checkoutUrl;
             this.attemptId = attemptId;
+            this.formParams = formParams == null ? java.util.Collections.emptyMap() : formParams;
         }
 
         public String getCheckoutUrl() {
@@ -135,6 +141,10 @@ public class StartCheckoutCommandHandler {
 
         public String getAttemptId() {
             return attemptId;
+        }
+
+        public java.util.Map<String, String> getFormParams() {
+            return formParams;
         }
     }
 }
