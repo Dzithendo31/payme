@@ -42,23 +42,29 @@ public class InvoiceSseHub {
     /**
      * Subscribes a new client to events for the given invoice.
      * Returns the {@link SseEmitter} for the controller to hand back to Spring.
+     *
+     * @dec~ Uses ConcurrentHashMap.compute() rather than computeIfAbsent + .add():
+     * compute() holds the per-bucket lock for the duration of the lambda, so a
+     * concurrent remove() that empties the list and nulls the map entry cannot
+     * race with a fresh subscribe(). Without this, an emitter added between
+     * "list became empty" and "map entry removed" would be silently orphaned.
      */
     public SseEmitter subscribe(String invoiceId) {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
 
-        // @dec~ CopyOnWriteArrayList over a synchronised List: writes (subscribe /
-        // remove) are rare relative to reads (publish iterates the list), and
-        // the list is small per invoice (usually 1-2 customer tabs).
-        emittersByInvoice
-                .computeIfAbsent(invoiceId, k -> new CopyOnWriteArrayList<>())
-                .add(emitter);
+        emittersByInvoice.compute(invoiceId, (k, existing) -> {
+            CopyOnWriteArrayList<SseEmitter> list = existing != null
+                    ? existing
+                    : new CopyOnWriteArrayList<>();
+            list.add(emitter);
+            return list;
+        });
 
         emitter.onCompletion(() -> remove(invoiceId, emitter));
         emitter.onTimeout(() -> remove(invoiceId, emitter));
         emitter.onError(t -> remove(invoiceId, emitter));
 
-        log.debug("SSE: subscribed to invoice={} (total={})",
-                invoiceId, emittersByInvoice.get(invoiceId).size());
+        log.debug("SSE: subscribed to invoice={}", invoiceId);
         return emitter;
     }
 
@@ -86,13 +92,20 @@ public class InvoiceSseHub {
         }
     }
 
+    /**
+     * @dec~ Atomic remove paired with subscribe(): compute() returns null to
+     * delete the map entry only when the list is genuinely empty after this
+     * removal, all under the bucket lock. Returning the same list reference
+     * keeps the entry; returning null evicts it. Closes the
+     * subscribe-while-removing race that would otherwise orphan a fresh emitter.
+     */
     private void remove(String invoiceId, SseEmitter emitter) {
-        CopyOnWriteArrayList<SseEmitter> emitters = emittersByInvoice.get(invoiceId);
-        if (emitters != null) {
-            emitters.remove(emitter);
-            if (emitters.isEmpty()) {
-                emittersByInvoice.remove(invoiceId, emitters);
+        emittersByInvoice.compute(invoiceId, (k, list) -> {
+            if (list == null) {
+                return null;
             }
-        }
+            list.remove(emitter);
+            return list.isEmpty() ? null : list;
+        });
     }
 }

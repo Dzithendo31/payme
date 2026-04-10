@@ -1,5 +1,7 @@
 package com.payme.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.payme.application.commandhandler.ProcessWebhookCommandHandler;
 import com.payme.domain.command.ProcessWebhookCommand;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,9 +37,14 @@ public class PayShapMockController {
     private static final Logger log = LoggerFactory.getLogger(PayShapMockController.class);
 
     private final ProcessWebhookCommandHandler processWebhookCommandHandler;
+    private final ObjectMapper objectMapper;
 
-    public PayShapMockController(ProcessWebhookCommandHandler processWebhookCommandHandler) {
+    public PayShapMockController(
+            ProcessWebhookCommandHandler processWebhookCommandHandler,
+            ObjectMapper objectMapper
+    ) {
         this.processWebhookCommandHandler = processWebhookCommandHandler;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping(value = "/{invoiceId}/payshap-mock", produces = MediaType.TEXT_HTML_VALUE)
@@ -64,10 +72,24 @@ public class PayShapMockController {
     ) {
         log.info("MockPayShap: customer {} for invoice={} attempt={}", outcome, invoiceId, attemptId);
 
-        String body = String.format(
-                "{\"attemptId\":\"%s\",\"invoiceId\":\"%s\",\"status\":\"%s\",\"providerEventId\":\"payshap_mock_%s\"}",
-                attemptId, invoiceId, outcome, UUID.randomUUID()
-        );
+        // @dec~ Build the synthetic webhook body via Jackson, not String.format,
+        // so that an attemptId / invoiceId / outcome containing a quote or
+        // backslash cannot break out of the JSON string. The mock is dev-only
+        // but the principle is structural — never hand-roll JSON from user input.
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("attemptId", attemptId);
+        payload.put("invoiceId", invoiceId);
+        payload.put("status", outcome);
+        payload.put("providerEventId", "payshap_mock_" + UUID.randomUUID());
+
+        String body;
+        try {
+            body = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            // A Map<String,String> always serialises; if Jackson somehow fails,
+            // surface it loudly rather than feeding a malformed body downstream.
+            throw new IllegalStateException("Failed to serialise mock PayShap webhook body", e);
+        }
 
         ProcessWebhookCommand cmd = new ProcessWebhookCommand(
                 UUID.randomUUID().toString(),
