@@ -246,3 +246,9 @@ For PayFast-specific issues, refer to:
 - [PayFast Setup Guide](docs/PAYFAST_SETUP.md)
 
 For PayMe application issues, check the application logs for detailed error messages.
+
+## Strategic review
+
+Every pull request gets one Watchman verdict on strategic alignment, edited in place as commits
+land. Configuration is in `.watchman.yml`; the rubric is `.watchman/rubric.md`; the job is
+`.github/workflows/watchman.yml`. Comment `/watchman review` to re-run it.
