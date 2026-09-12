@@ -1,5 +1,6 @@
 package com.payme.application.commandhandler;
 
+import com.payme.application.CheckoutRoutingPolicy;
 import com.payme.domain.*;
 import com.payme.domain.command.StartCheckoutCommand;
 import com.payme.domain.event.InvoiceMarkedPending;
@@ -9,6 +10,7 @@ import com.payme.domain.exceptions.InvoiceNotFoundException;
 import com.payme.ports.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,11 +33,16 @@ public class StartCheckoutCommandHandler {
     private final InvoiceRepository invoiceRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
     private final PaymentProviderRegistry providerRegistry;
+    private final CheckoutRoutingPolicy routingPolicy;
     private final Clock clock;
     private final CheckoutUrls checkoutUrls;
     private final EventStore eventStore;
     private final EventPublisher eventPublisher;
 
+    /**
+     * Convenience constructor without a routing policy: the requested provider
+     * is honoured as-is. Kept for callers wired before routing existed.
+     */
     public StartCheckoutCommandHandler(
             InvoiceRepository invoiceRepository,
             PaymentAttemptRepository paymentAttemptRepository,
@@ -45,9 +52,25 @@ public class StartCheckoutCommandHandler {
             EventStore eventStore,
             EventPublisher eventPublisher
     ) {
+        this(invoiceRepository, paymentAttemptRepository, providerRegistry,
+                CheckoutRoutingPolicy.passthrough(), clock, checkoutUrls, eventStore, eventPublisher);
+    }
+
+    @Autowired
+    public StartCheckoutCommandHandler(
+            InvoiceRepository invoiceRepository,
+            PaymentAttemptRepository paymentAttemptRepository,
+            PaymentProviderRegistry providerRegistry,
+            CheckoutRoutingPolicy routingPolicy,
+            Clock clock,
+            CheckoutUrls checkoutUrls,
+            EventStore eventStore,
+            EventPublisher eventPublisher
+    ) {
         this.invoiceRepository = invoiceRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.providerRegistry = providerRegistry;
+        this.routingPolicy = routingPolicy;
         this.clock = clock;
         this.checkoutUrls = checkoutUrls;
         this.eventStore = eventStore;
@@ -59,18 +82,23 @@ public class StartCheckoutCommandHandler {
         Instant now = clock.now();
         InvoiceId invoiceId = new InvoiceId(cmd.invoiceId());
 
-        // @dec(ARCH-001) null provider on the command means "use the env default"
-        ProviderName chosenProvider = cmd.provider() != null
-                ? cmd.provider()
-                : providerRegistry.defaultProvider();
-        PaymentProvider paymentProvider = providerRegistry.get(chosenProvider);
-
-        log.info("Starting checkout for invoice {} via provider {}",
-                invoiceId.getValue(), chosenProvider);
-
         // 1. Fetch invoice
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new InvoiceNotFoundException("Invoice not found: " + invoiceId.getValue()));
+
+        // Resolve the rail: the routing policy takes the customer's choice (or
+        // null for "no preference") and applies the pinned-rail / PayShap-cap
+        // rules against the invoice amount before we touch the registry.
+        ProviderName chosenProvider = routingPolicy.route(
+                cmd.provider(),
+                providerRegistry.defaultProvider(),
+                providerRegistry.available(),
+                invoice.getMoney()
+        );
+        PaymentProvider paymentProvider = providerRegistry.get(chosenProvider);
+
+        log.info("Starting checkout for invoice {} via provider {} (requested={})",
+                invoiceId.getValue(), chosenProvider, cmd.provider());
 
         // 2. Validate invoice is payable
         if (!invoice.isPayable(now)) {

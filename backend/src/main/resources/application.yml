@@ -28,6 +28,12 @@ management:
 payme:
   payment:
     provider: ${PAYMENT_PROVIDER:FAKE}
+    routing:
+      # Force every checkout onto one rail (PAYFAST | PAYSHAP). Empty = customer chooses.
+      pinned-provider: ${PAYMENT_PINNED_PROVIDER:}
+      # PayShap per-transaction cap in ZAR. Invoices above this are routed to
+      # PayFast when it is registered. Empty = no cap.
+      payshap-max-amount: ${PAYSHAP_MAX_AMOUNT:3000.00}
   payfast:
     # Set to false to skip PayFast registration entirely (demo runs PayShap-only).
     # When true, PAYFAST_MERCHANT_ID and PAYFAST_MERCHANT_KEY must be set or
