@@ -1,0 +1,28 @@
+# Watchman — strategic-alignment review configuration.
+# Read from the default branch, never from a pull request head.
+# Engine: https://github.com/z10-labs/watchman (implementations/github-app)
+version: 1
+
+brain:
+  # The source of truth lives at the repository root.
+  path: ""
+  required_reading:
+    - README.md
+    - CLAUDE.md
+    - INNOVATION_ROADMAP.md
+    - decisions/_index.md
+  decisions: decisions/
+
+rubric: .watchman/rubric.md
+
+gate:
+  # advisory: a strategic blocker is a neutral check; required: it can gate a merge.
+  mode: advisory
+  max_diff_lines: 500
+  skip_paths:
+    - "requests/**"
+    - "stories.csv"
+    - "progress.md"
+    - "**/mvnw"
+    - "**/mvnw.cmd"
+    - "**/.mvn/**"
