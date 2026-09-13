@@ -44,7 +44,7 @@ env:
   # purpose. `main` is here only because this file is the template; a moving
   # ref here is a moving reviewer.
   WATCHMAN_ENGINE_REPO: z10-labs/watchman
-  WATCHMAN_ENGINE_REF: 19c17d0f56472a627e8c2f2aecacc22878a435b9 # ci-watchman branch, 2026-09-12
+  WATCHMAN_ENGINE_REF: 2e82b0e927279b275d0242b1bf0bb887e2b6ca2d # ci-watchman branch, 2026-09-12
   WATCHMAN_ENGINE_DIR: .watchman-engine/implementations/github-app
 
 jobs:

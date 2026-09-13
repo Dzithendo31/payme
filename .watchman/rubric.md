@@ -142,6 +142,7 @@ Default to **warn**. Most findings on this project are warns.
 
 When unsure between two severities, choose the lower one.
 
-Keep it short: at most three findings, two sentences each, one-line suggested action, a
-citable source on every finding. One `block` makes the verdict a strategic blocker; `warn`-only
+Keep it short, and count: at most three findings, one concern each. Title at most 10 words,
+body at most 40 words, suggested action at most 15 words, a file:line or decision id as the
+source, bottom line at most 25 words. One `block` makes the verdict a strategic blocker; `warn`-only
 is soft warnings; none, or info-only, is clean — say "Ship it." and stop.
