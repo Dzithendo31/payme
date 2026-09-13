@@ -3,6 +3,7 @@ package com.payme.api;
 import com.payme.api.dto.CheckoutResponse;
 import com.payme.api.dto.PayPageResponse;
 import com.payme.api.sse.InvoiceSseHub;
+import com.payme.application.CheckoutRoutingPolicy;
 import com.payme.application.GetPayPageDataUseCase;
 import com.payme.application.commandhandler.StartCheckoutCommandHandler;
 import com.payme.domain.Invoice;
@@ -34,6 +35,7 @@ public class PayController {
     private final GetPayPageDataUseCase getPayPageDataUseCase;
     private final StartCheckoutCommandHandler startCheckoutCommandHandler;
     private final PaymentProviderRegistry providerRegistry;
+    private final CheckoutRoutingPolicy routingPolicy;
     private final InvoiceSseHub sseHub;
     private final Clock clock;
 
@@ -41,12 +43,14 @@ public class PayController {
             GetPayPageDataUseCase getPayPageDataUseCase,
             StartCheckoutCommandHandler startCheckoutCommandHandler,
             PaymentProviderRegistry providerRegistry,
+            CheckoutRoutingPolicy routingPolicy,
             InvoiceSseHub sseHub,
             Clock clock
     ) {
         this.getPayPageDataUseCase = getPayPageDataUseCase;
         this.startCheckoutCommandHandler = startCheckoutCommandHandler;
         this.providerRegistry = providerRegistry;
+        this.routingPolicy = routingPolicy;
         this.sseHub = sseHub;
         this.clock = clock;
     }
@@ -150,8 +154,10 @@ public class PayController {
     public ResponseEntity<PayPageResponse> getPayPage(@PathVariable String invoiceId) {
         Invoice invoice = getPayPageDataUseCase.execute(invoiceId);
 
-        // @dec(ARCH-001) Pay page advertises real rails available in this env
-        Set<ProviderName> publicProviders = publicFacingProviders();
+        // @dec(ARCH-001) Pay page advertises real rails available in this env,
+        // narrowed to what the routing policy will honour for this invoice so
+        // the picker never shows a rail the checkout would silently swap out.
+        Set<ProviderName> publicProviders = routingPolicy.offered(publicFacingProviders(), invoice.getMoney());
         ProviderName defaultProvider = publicDefaultProvider(publicProviders);
 
         PayPageResponse response = PayPageResponse.fromDomain(
