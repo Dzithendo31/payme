@@ -62,7 +62,7 @@ Does the change respect the hexagonal shape described in `README.md` and `CLAUDE
 - **The SSE hub is single-instance by design** (ARCH-002). Work that assumes it scales
   horizontally, or quietly introduces a second real-time channel, needs a decision.
 - **Webhooks stay verified and idempotent.** Signature checks, IP validation and dedup are
-  load-bearing. A new provider that skips them is a blocker, not a warning.
+  load-bearing. A new provider that skips them is one of the few genuine blockers.
 
 ### 3. Decision conformance
 
@@ -96,7 +96,8 @@ Are load-bearing choices recorded the way `CLAUDE.md` says they must be?
   messaging technology; enum changes that touch database CHECK constraints (see `CLAUDE.md`,
   "Things that have bitten us before"); a change to webhook verification; a new real-time
   channel; anything that alters the customer-facing pay flow.
-- **When in doubt, ask for the entry.** A sixty-second decision file costs less than silent drift.
+- **When in doubt, ask for the entry — as a warn.** A missing decision file is settled by
+  writing one, not by holding the merge.
 
 ### 6. Cross-task impact
 
@@ -126,14 +127,21 @@ Does this make the next roadmap step harder than it needs to be?
 
 ## Severity calibration
 
-- **info** — worth knowing, does not block. A breadcrumb for whoever comes next.
-- **warn** — should be addressed before merge but not necessarily in this pull request; a
-  decision entry is often enough.
-- **block** — must be resolved before merge. Use sparingly; over-blocking erodes signal.
+Default to **warn**. Most findings on this project are warns.
 
-Every finding carries a suggested action — fix in this PR, record a decision, split the PR,
-or accept with a stated rationale — and a citable source: a file and line, a decision ID, or a
-section of the required reading.
+- **block** — rare. Only when the diff breaks something PayMe cannot ship broken, and you can
+  cite the line that does it:
+  - money moves wrongly: wrong amount, wrong currency, double charge, a paid invoice not marked paid;
+  - webhook signature, IP validation or idempotency is removed or bypassed;
+  - the customer pay flow is broken for a rail that works today;
+  - an active decision is contradicted in code *and* the contradiction causes one of the above.
+- **warn** — a real concern that can be settled after merge: a missing or out-of-date decision
+  entry, a policy that should be recorded, a shape that makes the next roadmap step harder,
+  a default that changes behaviour and should be stated.
+- **info** — worth knowing; no action required.
 
-One `block` makes the verdict a strategic blocker. Otherwise `warn`-only is soft warnings.
-No findings, or info-only, is clean — say "ship it" and stop.
+When unsure between two severities, choose the lower one.
+
+Keep it short: at most three findings, two sentences each, one-line suggested action, a
+citable source on every finding. One `block` makes the verdict a strategic blocker; `warn`-only
+is soft warnings; none, or info-only, is clean — say "Ship it." and stop.
